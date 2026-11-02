@@ -17,6 +17,9 @@ from pyspark.sql import functions as F
 
 
 def _staging_path(target: Path) -> Path:
+    # Remove staging dirs left behind by a crashed run before creating a new one.
+    for stale in target.parent.glob(f".{target.name}_staging_*"):
+        shutil.rmtree(stale, ignore_errors=True)
     return target.parent / f".{target.name}_staging_{uuid.uuid4().hex[:8]}"
 
 

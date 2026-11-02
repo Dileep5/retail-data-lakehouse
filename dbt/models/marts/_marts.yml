@@ -30,8 +30,14 @@ models:
               arguments:
                 to: ref('dim_stores')
                 field: store_id
+      - name: customer_resolution
+        description: How customer_sk was resolved (point_in_time, first_version, unknown).
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["point_in_time", "first_version", "unknown"]
       - name: customer_sk
-        description: Customer version valid on order_date.
+        description: Customer version valid on order_date ('-1' = customer not in CRM yet).
         data_tests:
           - not_null
           - relationships:

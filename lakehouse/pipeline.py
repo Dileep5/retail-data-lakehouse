@@ -6,6 +6,7 @@ from __future__ import annotations
 import datetime as dt
 import json
 import logging
+import time
 
 import psycopg
 
@@ -20,6 +21,7 @@ STEPS = ("generate", "bronze", "silver", "quality", "load", "dbt", "reconcile")
 
 def init(settings: Settings) -> None:
     """Create databases and base schemas (idempotent)."""
+    settings.require_databases()
     ensure_database(settings.source_db_url)
     ensure_database(settings.warehouse_db_url)
     run_sql_file(settings.source_db_url, "source_schema.sql")
@@ -120,6 +122,7 @@ def run_batch(settings: Settings, batch_date: dt.date, *, skip_generate: bool = 
     for name in STEPS:
         if name == "generate" and skip_generate:
             continue
+        started = time.perf_counter()
         try:
             results[name] = STEP_FUNCTIONS[name](settings, batch_date)
         except Exception:
@@ -128,7 +131,9 @@ def run_batch(settings: Settings, batch_date: dt.date, *, skip_generate: bool = 
                     _mark_batch(settings, batch_date, "failed")
                 except Exception:  # pragma: no cover - best effort
                     logger.exception("could not mark batch failed")
+            logger.error("batch %s failed in step %s after %.1fs", batch_date, name, time.perf_counter() - started)
             raise
-        logger.info("step %-9s done: %s", name, results[name])
+        logger.info("batch %s step %-9s done in %5.1fs: %s", batch_date, name, time.perf_counter() - started,
+                    results[name])
     _mark_batch(settings, batch_date, "succeeded", results)
     return results

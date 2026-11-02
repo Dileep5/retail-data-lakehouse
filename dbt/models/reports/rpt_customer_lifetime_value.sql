@@ -11,4 +11,5 @@ select
 from {{ ref('dim_customers') }} c
 left join {{ ref('fct_orders') }} f on f.customer_id = c.customer_id
 where c.is_current
+  and c.customer_id <> -1  -- exclude the unknown member
 group by 1, 2, 3, 4

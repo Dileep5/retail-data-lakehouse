@@ -65,5 +65,17 @@ def main(argv: list[str] | None = None) -> int:
     return 0
 
 
+def run() -> int:
+    """Entry point with concise errors: the traceback goes to the log, the reason to stderr."""
+    try:
+        return main()
+    except KeyboardInterrupt:
+        return 130
+    except Exception as exc:
+        logging.getLogger("lakehouse").debug("pipeline failure", exc_info=True)
+        print(f"ERROR ({type(exc).__name__}): {exc}", file=sys.stderr)
+        return 1
+
+
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(run())

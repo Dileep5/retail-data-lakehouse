@@ -10,8 +10,9 @@ RUN apt-get update \
 ENV JAVA_HOME=/opt/java
 
 COPY requirements.txt /tmp/pipeline-requirements.txt
+# The base image sets PIP_USER=true, which breaks installs into a virtualenv.
 RUN python -m venv /opt/pipeline-venv \
- && /opt/pipeline-venv/bin/pip install --no-cache-dir -r /tmp/pipeline-requirements.txt
+ && PIP_USER=false /opt/pipeline-venv/bin/pip install --no-cache-dir -r /tmp/pipeline-requirements.txt
 
 COPY --chown=airflow:root . /opt/lakehouse
 RUN mkdir -p /opt/lakehouse/lake /opt/lakehouse/data/landing && chown -R airflow:root /opt/lakehouse

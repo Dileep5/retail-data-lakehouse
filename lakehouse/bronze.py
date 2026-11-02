@@ -26,6 +26,14 @@ DB_ENTITIES = {"orders": "sales.orders", "order_items": "sales.order_items"}
 EPOCH = dt.datetime(1970, 1, 1)
 
 
+class OutOfOrderBatchError(RuntimeError):
+    """Raised when re-running a batch older than the latest succeeded batch.
+
+    Snapshot entities (customers, products) are replaced wholesale, so replaying an older
+    batch would roll the warehouse's current state back in time.
+    """
+
+
 @dataclass(frozen=True)
 class Window:
     start: dt.datetime  # exclusive
@@ -56,6 +64,12 @@ def register_batch(settings: Settings, batch_date: dt.date) -> Window:
         rows = conn.execute(
             "SELECT batch_id, window_start, window_end, status FROM meta.ingestion_batches"
         ).fetchall()
+        newer = sorted(b for b, _s, _e, status in rows if status == "succeeded" and b > batch_date)
+        if newer:
+            raise OutOfOrderBatchError(
+                f"Batch {batch_date} is older than succeeded batch {newer[-1]}; re-running it would roll back "
+                "snapshot tables. Re-run the latest batch instead, or rebuild from scratch for a backfill."
+            )
         window = compute_window(batch_date, rows)
         conn.execute(
             """

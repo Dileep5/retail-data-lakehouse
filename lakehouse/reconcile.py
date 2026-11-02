@@ -93,7 +93,9 @@ def run_reconciliation(settings: Settings, batch_date: dt.date, window: Window) 
         ).fetchone()[0]
         report.add("revenue:silver_vs_fct_orders", silver_revenue(settings), fact_revenue, tolerance=0.01)
 
-        current = dw.execute("SELECT count(*) FROM analytics_marts.dim_customers WHERE is_current").fetchone()[0]
+        current = dw.execute(  # customer_id -1 is the unknown member, not a real customer
+            "SELECT count(*) FROM analytics_marts.dim_customers WHERE is_current AND customer_id <> -1"
+        ).fetchone()[0]
         silver_customers = len(pd.read_parquet(settings.silver_root / "customers", columns=["customer_id"]))
         report.add("dim_customers_current_vs_silver", silver_customers, current)
 

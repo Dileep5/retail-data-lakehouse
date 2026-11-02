@@ -59,6 +59,8 @@ class DayOutput:
     orders: list[tuple] = field(default_factory=list)
     order_items: list[tuple] = field(default_factory=list)
     status_updates: list[tuple] = field(default_factory=list)  # (order_id, new_status, updated_at)
+    late_item_order_ids: list[int] = field(default_factory=list)  # older orders that gained a line item
+    late_customer_ids: list[int] = field(default_factory=list)  # ordered today, in CRM export tomorrow
 
 
 @dataclass
@@ -96,20 +98,24 @@ def _add_orders(state: _State, rng: random.Random, day: dt.date, count: int, out
     product_ids = sorted(state.products)
     open_stores = [sid for sid in STORES if STORE_OPENED.get(sid, dt.date.min) <= day]
     for _ in range(count):
-        oid = state.next_order_id
-        state.next_order_id += 1
-        customer = rng.choice(eligible)
-        created = _ts(day, rng)
-        status = rng.choices(["completed", "cancelled"], weights=[95, 5])[0]
-        channel = rng.choices(["online", "in_store"], weights=[32, 68])[0]
-        state.orders[oid] = {"date": day, "status": status}
-        out.orders.append((oid, customer["customer_id"], rng.choice(open_stores), day, channel, status,
-                           created, created))
-        for pid in rng.sample(product_ids, rng.randint(1, 4)):
-            price = state.products[pid]["unit_price"]
-            out.order_items.append((state.next_item_id, oid, pid, rng.randint(1, 3), price,
-                                    rng.choice([0, 0, 0, 5, 10, 15, 20]), created, created))
-            state.next_item_id += 1
+        _add_order(state, rng, day, rng.choice(eligible), open_stores, product_ids, out)
+
+
+def _add_order(state: _State, rng: random.Random, day: dt.date, customer: dict, open_stores: list[int],
+               product_ids: list[int], out: DayOutput) -> None:
+    oid = state.next_order_id
+    state.next_order_id += 1
+    created = _ts(day, rng)
+    status = rng.choices(["completed", "cancelled"], weights=[95, 5])[0]
+    channel = rng.choices(["online", "in_store"], weights=[32, 68])[0]
+    state.orders[oid] = {"date": day, "status": status}
+    out.orders.append((oid, customer["customer_id"], rng.choice(open_stores), day, channel, status,
+                       created, created))
+    for pid in rng.sample(product_ids, rng.randint(1, 4)):
+        price = state.products[pid]["unit_price"]
+        out.order_items.append((state.next_item_id, oid, pid, rng.randint(1, 3), price,
+                                rng.choice([0, 0, 0, 5, 10, 15, 20]), created, created))
+        state.next_item_id += 1
 
 
 def _simulate_day(state: _State, index: int) -> DayOutput:
@@ -169,9 +175,25 @@ def _simulate_day(state: _State, index: int) -> DayOutput:
         for oid in rng.sample(recent, min(4, len(recent))):
             state.orders[oid]["status"] = "returned"
             out.status_updates.append((oid, "returned", _ts(activity_day, rng)))
+        # Late-arriving fact: a line item added today to an order placed days ago (e.g. an
+        # accessory attached at pickup). The order row itself does not change.
+        older = sorted(oid for oid, o in state.orders.items()
+                       if o["status"] == "completed" and (activity_day - o["date"]).days in range(2, 10))
+        if older:
+            oid, pid, ts = rng.choice(older), rng.choice(sorted(state.products)), _ts(activity_day, rng)
+            out.order_items.append((state.next_item_id, oid, pid, 1, state.products[pid]["unit_price"], 0, ts, ts))
+            state.next_item_id += 1
+            out.late_item_order_ids.append(oid)
+        # Late-arriving dimension member: signs up and orders online today, but the CRM
+        # export only includes them from tomorrow's file.
+        late = _new_customer(state, rng, activity_day)
+        late["crm_visible_from"] = batch_date + dt.timedelta(days=1)
+        open_stores = [sid for sid in STORES if STORE_OPENED.get(sid, dt.date.min) <= activity_day]
+        _add_order(state, rng, activity_day, late, open_stores, sorted(state.products), out)
+        out.late_customer_ids.append(late["customer_id"])
 
     _inject_order_defects(state, out, rng)
-    out.customers = _customer_snapshot(state, rng, index)
+    out.customers = _customer_snapshot(state, rng, index, batch_date)
     out.products = _product_snapshot(state, index)
     out.inventory = _inventory_snapshot(state, rng, batch_date)
     return out
@@ -197,8 +219,8 @@ def _inject_order_defects(state: _State, out: DayOutput, rng: random.Random) -> 
     out.order_items.append(tuple(bad))
 
 
-def _customer_snapshot(state: _State, rng: random.Random, index: int) -> pd.DataFrame:
-    rows = [dict(c) for c in state.customers.values()]
+def _customer_snapshot(state: _State, rng: random.Random, index: int, batch_date: dt.date) -> pd.DataFrame:
+    rows = [dict(c) for c in state.customers.values() if c.get("crm_visible_from", dt.date.min) <= batch_date]
     # Normalisable defects: mixed-case/whitespace emails, lower-case province codes.
     for row in rng.sample(rows, 5):
         row["email"] = f"  {row['email'].upper()} "

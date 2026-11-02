@@ -9,7 +9,8 @@ from pathlib import Path
 import pytest
 
 os.environ.setdefault("AIRFLOW__CORE__LOAD_EXAMPLES", "False")
-airflow = pytest.importorskip("airflow")
+# Check a real Airflow module: the repo's own airflow/ folder (DAGs) is importable as "airflow".
+pytest.importorskip("airflow.models")
 from airflow.models import DagBag  # noqa: E402
 
 DAG_FOLDER = Path(__file__).resolve().parents[2] / "airflow" / "dags"

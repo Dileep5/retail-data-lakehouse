@@ -11,6 +11,7 @@ import time
 import psycopg
 
 from lakehouse import bronze, generate
+from lakehouse.bronze import OutOfOrderBatchError
 from lakehouse.config import Settings
 from lakehouse.db import ensure_database, run_sql_file
 
@@ -125,6 +126,8 @@ def run_batch(settings: Settings, batch_date: dt.date, *, skip_generate: bool = 
         started = time.perf_counter()
         try:
             results[name] = STEP_FUNCTIONS[name](settings, batch_date)
+        except OutOfOrderBatchError:
+            raise  # refused before any work: the existing batch record must stay untouched
         except Exception:
             if name not in ("generate",):
                 try:

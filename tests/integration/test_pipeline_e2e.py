@@ -159,6 +159,8 @@ def test_rerunning_an_older_batch_is_refused(env):
     with pytest.raises(OutOfOrderBatchError):
         run_batch(settings, D1)
     assert fingerprint(settings.warehouse_db_url) == before
+    # The refused request must not rewrite the audit trail of the original run.
+    assert _q(settings, "SELECT status FROM meta.ingestion_batches WHERE batch_id = %s", D1) == [("succeeded",)]
 
 
 def test_quality_gate_blocks_bad_batch_and_recovers(env):

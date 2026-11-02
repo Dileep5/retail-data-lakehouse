@@ -1,0 +1,9 @@
+store_id,store_name,city,province,region,opened_date
+1,Maple Ridge Toronto Queen St,Toronto,ON,Central,2015-04-01
+2,Maple Ridge Ottawa Rideau,Ottawa,ON,Central,2016-09-15
+3,Maple Ridge Montreal Plateau,Montreal,QC,East,2017-05-20
+4,Maple Ridge Vancouver Kitsilano,Vancouver,BC,West,2018-03-10
+5,Maple Ridge Calgary Kensington,Calgary,AB,West,2019-06-01
+6,Maple Ridge Waterloo Uptown,Waterloo,ON,Central,2021-08-28
+7,Maple Ridge Kelowna,Kelowna,BC,West,2025-03-14
+8,Maple Ridge Halifax Waterfront,Halifax,NS,East,2025-10-02

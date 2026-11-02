@@ -1,0 +1,40 @@
+version: 2
+
+models:
+  - name: stg_customers
+    columns:
+      - name: customer_id
+        data_tests: [unique, not_null]
+      - name: loyalty_tier
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["Bronze", "Silver", "Gold"]
+  - name: stg_orders
+    columns:
+      - name: order_id
+        data_tests: [unique, not_null]
+      - name: status
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["completed", "returned", "cancelled"]
+      - name: channel
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["online", "in_store"]
+  - name: stg_order_items
+    columns:
+      - name: order_item_id
+        data_tests: [unique, not_null]
+      - name: order_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_orders')
+                field: order_id
+  - name: stg_products
+    columns:
+      - name: product_id
+        data_tests: [unique, not_null]

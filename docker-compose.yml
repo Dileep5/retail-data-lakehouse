@@ -1,0 +1,62 @@
+x-pipeline-env: &pipeline-env
+  SOURCE_DB_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/retail_source
+  WAREHOUSE_DB_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/retail_dw
+  LAKE_ROOT: /opt/lakehouse/lake
+  LANDING_ROOT: /opt/lakehouse/data/landing
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/postgres-init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # Airflow 3 in standalone mode (api-server, scheduler, dag-processor, triggerer).
+  # UI: http://localhost:8080  (all users are admins in this local setup)
+  airflow:
+    build:
+      context: .
+      dockerfile: Dockerfile.airflow
+    command: standalone
+    environment:
+      <<: *pipeline-env
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/airflow
+      AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: "True"
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    ports:
+      - "8080:8080"
+    volumes:
+      - lake:/opt/lakehouse/lake
+      - landing:/opt/lakehouse/data/landing
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # One-off CLI runs without Airflow, e.g.:
+  #   docker compose run --rm pipeline demo --days 3
+  pipeline:
+    build: .
+    profiles: ["cli"]
+    environment: *pipeline-env
+    volumes:
+      - lake:/opt/lakehouse/lake
+      - landing:/opt/lakehouse/data/landing
+      - ./reports:/opt/lakehouse/reports
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  lake:
+  landing:

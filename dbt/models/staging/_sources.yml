@@ -1,0 +1,13 @@
+version: 2
+
+sources:
+  - name: lake_silver
+    description: Silver-layer tables loaded from the lakehouse by lakehouse/load.py
+    schema: lake_silver
+    tables:
+      - name: customers
+        description: Current customer snapshot (latest CRM export, cleaned)
+      - name: products
+      - name: orders
+      - name: order_items
+      - name: inventory

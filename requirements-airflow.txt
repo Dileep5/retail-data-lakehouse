@@ -1,0 +1,6 @@
+# Airflow is installed in its own environment with the official constraints file, e.g.:
+#   AIRFLOW_VERSION=3.3.2
+#   pip install "apache-airflow==${AIRFLOW_VERSION}" \
+#     --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-3.12.txt"
+apache-airflow==3.3.2
+pytest>=8.2,<9

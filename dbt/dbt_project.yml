@@ -1,0 +1,31 @@
+name: retail_lakehouse
+version: "1.0.0"
+config-version: 2
+profile: retail_lakehouse
+
+model-paths: ["models"]
+snapshot-paths: ["snapshots"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+target-path: "target"
+clean-targets: ["target", "dbt_packages"]
+
+models:
+  retail_lakehouse:
+    staging:
+      +schema: staging
+      +materialized: view
+    marts:
+      +schema: marts
+      +materialized: table
+    reports:
+      +schema: reports
+      +materialized: view
+
+seeds:
+  retail_lakehouse:
+    +schema: reference
+
+flags:
+  send_anonymous_usage_stats: false

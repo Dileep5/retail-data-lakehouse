@@ -1,0 +1,17 @@
+.venv/
+.venv-airflow/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.env
+lake/
+data/landing/
+dbt/target/
+dbt/logs/
+dbt/dbt_packages/
+logs/
+spark-warehouse/
+metastore_db/
+derby.log
+.DS_Store

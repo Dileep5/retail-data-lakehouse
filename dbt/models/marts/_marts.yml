@@ -1,0 +1,60 @@
+version: 2
+
+models:
+  - name: dim_customers
+    description: SCD Type 2 customer dimension (one row per version).
+    columns:
+      - name: customer_sk
+        data_tests: [unique, not_null]
+      - name: customer_id
+        data_tests: [not_null]
+  - name: dim_products
+    columns:
+      - name: product_id
+        data_tests: [unique, not_null]
+  - name: dim_stores
+    columns:
+      - name: store_id
+        data_tests: [unique, not_null]
+  - name: dim_date
+    columns:
+      - name: date_day
+        data_tests: [unique, not_null]
+  - name: fct_orders
+    columns:
+      - name: order_id
+        data_tests: [unique, not_null]
+      - name: store_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_stores')
+                field: store_id
+      - name: customer_sk
+        description: Customer version valid on order_date.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_customers')
+                field: customer_sk
+  - name: fct_order_items
+    columns:
+      - name: order_item_id
+        data_tests: [unique, not_null]
+      - name: order_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('fct_orders')
+                field: order_id
+      - name: product_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_products')
+                field: product_id
+  - name: fct_inventory_daily
+    columns:
+      - name: snapshot_date
+        data_tests: [not_null]

@@ -1,0 +1,13 @@
+# Connection settings come from DW_* environment variables (set by lakehouse/dbt_runner.py).
+retail_lakehouse:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('DW_HOST', 'localhost') }}"
+      port: "{{ env_var('DW_PORT', '5432') | as_number }}"
+      user: "{{ env_var('DW_USER', 'postgres') }}"
+      password: "{{ env_var('DW_PASSWORD', '') }}"
+      dbname: "{{ env_var('DW_DBNAME', 'retail_dw') }}"
+      schema: analytics
+      threads: 4

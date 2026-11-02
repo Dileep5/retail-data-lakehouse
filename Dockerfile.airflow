@@ -1,0 +1,23 @@
+# Airflow 3 with the pipeline installed in a separate virtualenv (/opt/pipeline-venv),
+# so PySpark/dbt/GX never conflict with Airflow's pinned dependencies.
+FROM apache/airflow:3.3.2-python3.12
+
+USER root
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends openjdk-17-jre-headless procps \
+ && rm -rf /var/lib/apt/lists/* \
+ && ln -sfn "$(dirname "$(dirname "$(readlink -f "$(which java)")")")" /opt/java
+ENV JAVA_HOME=/opt/java
+
+COPY requirements.txt /tmp/pipeline-requirements.txt
+RUN python -m venv /opt/pipeline-venv \
+ && /opt/pipeline-venv/bin/pip install --no-cache-dir -r /tmp/pipeline-requirements.txt
+
+COPY --chown=airflow:root . /opt/lakehouse
+RUN mkdir -p /opt/lakehouse/lake /opt/lakehouse/data/landing && chown -R airflow:root /opt/lakehouse
+
+USER airflow
+ENV PIPELINE_PYTHON=/opt/pipeline-venv/bin/python \
+    LAKEHOUSE_PROJECT_DIR=/opt/lakehouse \
+    AIRFLOW__CORE__DAGS_FOLDER=/opt/lakehouse/airflow/dags \
+    AIRFLOW__CORE__LOAD_EXAMPLES=False

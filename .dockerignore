@@ -1,0 +1,11 @@
+.venv
+.venv-airflow
+.git
+lake
+data/landing
+reports
+dbt/target
+dbt/logs
+**/__pycache__
+.pytest_cache
+.env

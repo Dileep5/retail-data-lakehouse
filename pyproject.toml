@@ -1,0 +1,22 @@
+[project]
+name = "retail-data-lakehouse"
+version = "1.0.0"
+description = "Retail medallion lakehouse: CSV + PostgreSQL -> Bronze -> Silver (PySpark) -> PostgreSQL -> dbt, orchestrated by Airflow."
+requires-python = ">=3.11"
+readme = "README.md"
+
+[tool.pytest.ini_options]
+testpaths = ["tests/unit", "tests/integration"]
+markers = ["postgres: needs a PostgreSQL server (TEST_PG_ADMIN_URL)"]
+filterwarnings = ["ignore::DeprecationWarning", "ignore::FutureWarning"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+extend-exclude = [".venv", ".venv-airflow", "lake", "dbt/target"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["B017"]

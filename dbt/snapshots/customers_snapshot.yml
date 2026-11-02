@@ -1,0 +1,12 @@
+version: 2
+
+# SCD Type 2 history of customer attributes. The timestamp strategy uses the CRM's
+# updated_at, so dbt_valid_from/dbt_valid_to reflect business time, not load time.
+snapshots:
+  - name: customers_snapshot
+    relation: source('lake_silver', 'customers')
+    config:
+      schema: snapshots
+      unique_key: customer_id
+      strategy: timestamp
+      updated_at: updated_at

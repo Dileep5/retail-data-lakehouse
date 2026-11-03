@@ -13,7 +13,7 @@ flowchart LR
     DBT --> REC{14 reconciliation checks}
 ```
 
-More detail: [ARCHITECTURE.md](ARCHITECTURE.md) · [IMPLEMENTATION_DETAILS.md](IMPLEMENTATION_DETAILS.md) · [TEST_RESULTS.md](TEST_RESULTS.md) · [TROUBLESHOOTING.md](TROUBLESHOOTING.md) · [INTERVIEW_GUIDE.md](INTERVIEW_GUIDE.md)
+**Try it:** [DEMO.md](DEMO.md) · More detail: [ARCHITECTURE.md](ARCHITECTURE.md) · [IMPLEMENTATION_DETAILS.md](IMPLEMENTATION_DETAILS.md) · [TEST_RESULTS.md](TEST_RESULTS.md) · [TROUBLESHOOTING.md](TROUBLESHOOTING.md) · [INTERVIEW_GUIDE.md](INTERVIEW_GUIDE.md)
 
 ## Highlights (measured; see TEST_RESULTS.md)
 
@@ -49,6 +49,7 @@ make install                       # .venv: PySpark, dbt-postgres, Great Expecta
 cp .env.example .env               # set SOURCE_DB_URL and WAREHOUSE_DB_URL (databases are created)
 export JAVA_HOME=/path/to/jdk-17   # if java isn't already on PATH
 make demo                          # batches 2025-11-01..03, then an idempotent re-run of 11-03
+                                   # (on a non-empty warehouse run `make reset` first)
 make report                        # reports/analytics_report.md from analytics/queries/*.sql
 make run DATE=2025-11-04           # next daily batch
 ```
@@ -82,6 +83,35 @@ docker compose down -v                                       # stop and delete D
 ```
 
 > Docker was **not executed** during development; it was unavailable. The image tags and Linux dependency resolution were verified instead. See TEST_RESULTS.md.
+
+## Sample input → expected output
+
+**Input:** `data/landing/2025-11-02/customers.csv` (generated deterministically) contains realistic defects:
+
+```
+customer_id,first_name,last_name,email,city,province,loyalty_tier,signup_date,updated_at
+85,Ethan,Anderson,  ETHAN.ANDERSON.85@EXAMPLE.COM ,Vancouver,BC,Silver,2023-02-20,2023-02-20 09:00:00
+92,Mia,Taylor,mia.taylor.92@example.com,Halifax,ns,Silver,2024-01-05,2024-01-05 09:00:00
+900001,...,not-an-email,...                       <- invalid row
+,Mohammed,Taylor,mohammed.taylor.2@example.com,...  <- missing key
+```
+
+**Output of batch 2025-11-02:**
+
+| Layer | Result |
+|---|---|
+| Silver | customer 85 → `ethan.anderson.85@example.com`; customer 92 → province `NS`; 2 exact duplicates removed |
+| Quarantine | `invalid_email` (id 900001), `missing_customer_id` |
+| Orders | 21 extracted: 16 new, 4 late status changes (completed → returned), 1 order from a customer whose CRM record only arrives in tomorrow's export |
+| `dim_customers` | customer 1: v1 `Gold` valid 2025-07-09 → 2025-11-01 09:30, v2 `Silver` current |
+| Quality gate | **22/23 passed, 0 critical failures** (see below) |
+| Reconciliation | 14/14 |
+
+### Why the quality report says 22/23
+
+From the second batch onward the generator deliberately includes one **late-arriving customer**: an order arrives today, but the customer's CRM row only appears in tomorrow's export. The expectation `orders.customer_id ∈ Silver customers` is configured with severity **warning** (`lakehouse/quality.py:suites`), so it reports that one row (`unexpected_count: 1`) without blocking the batch. Only *critical* failures or a quarantine rate above 5% stop a batch.
+
+The order is attributed to the unknown customer (`customer_sk = '-1'`, `customer_resolution = 'unknown'`) and re-attributed point-in-time by the next batch. The dbt test `assert_unknown_customer_orders_are_recent` fails if any order stays unresolved for more than 2 days. Batch 1 shows 23/23 because it contains no late customer.
 
 ## Example analytics (from `make report`, after batches 2025-11-01..04)
 

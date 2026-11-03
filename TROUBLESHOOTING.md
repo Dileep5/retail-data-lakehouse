@@ -20,6 +20,7 @@
 | `ReconciliationError: load_complete:… expected X, got Y` | Warehouse and Silver disagree (e.g. a manual edit in `lake_silver`) | Re-run the latest batch. Loads are upserts, so this repairs it |
 | `DbtError: … Failure in test …` | A dbt test failed | Read the failing test name in the error; compiled SQL is under `dbt/target/compiled/`; run `dbt test --select <test> --store-failures` to inspect rows |
 | A batch shows `failed` in `meta.ingestion_batches` | Some step raised | Fix the cause and re-run that batch. If you skip it instead, the next batch's window starts at the last *succeeded* batch, so its OLTP changes are not lost |
+| Quality report shows 22/23 checks | Intentional. The one non-pass is the **warning**-level check `orders.customer_id ∈ Silver customers`, triggered by the late-arriving customer the generator adds from batch 2 on (`unexpected_count: 1`). Warnings never block a batch | Nothing to fix; see README "Why the quality report says 22/23" |
 | Orders with `customer_resolution = 'unknown'` | The customer's CRM record hasn't arrived yet (late-arriving dimension) | Normal for the most recent day; re-attributed automatically by the next batch. The dbt test fails if this persists more than 2 days |
 | Leftover `.orders_staging_*` directories | A run crashed mid-merge | Removed automatically by the next merge |
 

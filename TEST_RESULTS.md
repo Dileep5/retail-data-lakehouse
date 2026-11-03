@@ -45,6 +45,37 @@ The audit added:
 - an extended recovery test;
 - 2 dbt tests.
 
+## 1b. Reproduction check (commit `a2a25ce`, 2026-11-03)
+
+The **59 pytest tests** run in two environments: 56 in `.venv` (`pytest` uses `testpaths = tests/unit, tests/integration`) and 3 DAG tests in `.venv-airflow`. Airflow's pinned dependencies are kept out of the pipeline venv, which is why there are two.
+
+```
+[2026-11-03T00:39:11Z] $ TEST_PG_ADMIN_URL=postgresql://postgres@localhost:5432/postgres .venv/bin/python -m pytest -q
+56 passed in 65.77s
+[2026-11-03T00:40:17Z] $ .venv-airflow/bin/python -m pytest tests/airflow -q -c /dev/null --rootdir .
+3 passed in 0.97s
+[2026-11-03T00:40:19Z] $ python -m lakehouse.cli run --batch-date 2025-11-04      # re-run of the latest batch
+7 steps done (silver 9.8s, quality 4.1s: 23 checks / 1 warning, dbt 11.6s, reconcile 14 checks passed)
+rerun 2025-11-04: identical tables 9 / 9                                           # fingerprint before vs after
+[2026-11-03T00:40:47Z] $ python -m lakehouse.cli run --batch-date 2025-11-02
+ERROR (OutOfOrderBatchError): Batch 2025-11-02 is older than succeeded batch 2025-11-04; ...
+[2026-11-03T00:40:49Z] $ airflow db migrate && airflow dags test retail_lakehouse 2025-11-05
+exit=0  tasks_success=7  DagRun Finished: logical_date=2025-11-05 ... state=success
+[2026-11-03T00:41:13Z] $ dbt test   (via lakehouse.dbt_runner, warehouse after batch 2025-11-05)
+Done. PASS=40 WARN=0 ERROR=0 SKIP=0 NO-OP=0 TOTAL=40
+quality 2025-11-04: 22/23, non-pass [('orders', 'customer_id', 'warning', 1)], reconcile 14/14
+quality 2025-11-05: 22/23, non-pass [('orders', 'customer_id', 'warning', 1)], reconcile 14/14
+```
+
+The DEMO.md commands were then executed verbatim from `make reset`:
+- 3 batches plus a re-run succeeded, and the fingerprint showed 9/9 tables identical;
+- the out-of-order re-run was refused;
+- customer 1's SCD2 history and the `[('orders','customer_id','warning',1)]` quality output matched the documented values.
+
+### Why data quality reports 22/23 from batch 2 onward
+
+This is intentional, not a failure. The generator adds one late-arriving customer per batch from batch 2: the order arrives before the customer's CRM row. The expectation `orders.customer_id ∈ Silver customers` has severity **warning** (`lakehouse/quality.py:suites`), so it reports `unexpected_count: 1` and does not block. Only critical expectations, or a quarantine rate above 5%, fail a batch. dbt handles the order with an unknown member and re-attributes it the next day (verified: customer 308 moved from `unknown` to `point_in_time` after batch 2025-11-04).
+
 ## 2. Full pipeline run on the sample data (2026-11-02T23:54:16Z → 23:55:26Z)
 
 Fresh databases and an empty lake; `lakehouse.cli run` for each batch.
@@ -63,7 +94,7 @@ Silver accounting (bronze rows → quarantined / duplicates / written):
 | 2025-11-02 | 307 → 2 / 2 / 303 | 41 → 1 / 0 / 40 | 321 → 1 / 0 / 320 | 21 → 0 / 0 / 21 | 48 → 1 / 0 / 47 | 22/23 ¹ | 14/14 |
 | 2025-11-03 | 311 → 2 / 2 / 307 | 41 → 1 / 0 / 40 | 321 → 1 / 0 / 320 | 28 → 0 / 0 / 28 | 52 → 1 / 0 / 51 | 22/23 ¹ | 14/14 |
 
-¹ The non-pass is the *warning-level* check `orders.customer_id ∈ silver customers`: the generated late-arriving customer. Warnings do not block, by design.
+¹ Intentional: the non-pass is the *warning-level* check `orders.customer_id ∈ silver customers`: the generated late-arriving customer. Warnings do not block, by design.
 
 Orders extracted for 2025-11-02 include 4 late status changes on earlier orders and one order by the late-arriving customer. Order items include one late item attached to an order placed 2–9 days earlier.
 

@@ -1,7 +1,7 @@
 PY ?= .venv/bin/python
 AIRFLOW_PY ?= .venv-airflow/bin/python
 
-.PHONY: install install-airflow lint test test-integration test-dag init demo run report docker-up docker-demo docker-down
+.PHONY: install install-airflow lint test test-integration test-dag init reset demo run report docker-up docker-demo docker-down
 
 install:
 	python3.12 -m venv .venv && $(PY) -m pip install -r requirements-dev.txt
@@ -25,7 +25,11 @@ test-dag:
 init:
 	$(PY) -m lakehouse.cli init
 
-demo:               ## 3 daily batches + an idempotent re-run of the last one
+reset:              ## drop both databases and the local lake (demo starts from batch 2025-11-01)
+	$(PY) -c "from lakehouse.config import get_settings; from lakehouse.db import drop_database; s = get_settings(); s.require_databases(); [drop_database(u) for u in (s.source_db_url, s.warehouse_db_url)]"
+	rm -rf lake data/landing
+
+demo:               ## 3 daily batches + an idempotent re-run of the last one (run `make reset` first if batches exist)
 	$(PY) -m lakehouse.cli demo --days 3
 
 run:                ## make run DATE=2025-11-04

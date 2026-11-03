@@ -160,7 +160,22 @@ That refusal exposed a bug: the refused request marked the old batch `failed`. I
 5. `pytest tests` crashed outside the Airflow venv: `importorskip("airflow")` matched the repo's own `airflow/` folder.
 6. The official Airflow image sets `PIP_USER=true`, which breaks `pip install` into the pipeline virtualenv. Fixed by inspection; not built.
 
+## 5. GitHub Actions CI
+
+The workflow is `.github/workflows/ci.yml` (`ubuntu-latest`, Python 3.12).
+
+| Run | Commit | Trigger | Result |
+|---|---|---|---|
+| [41555834547](https://github.com/Dileep5/retail-data-lakehouse/actions/runs/41555834547) | `8abca04` | first push to `main`, 2026-11-03T00:51Z | **success**, both jobs |
+
+| Job | Duration | Steps (all `success`) |
+|---|---|---|
+| `pipeline` | 4m30s (00:51:40 → 00:56:10 UTC) | Temurin Java 17 setup; install; lint; dependency checks (`pip check` + `pip-audit`, ignoring only the 5 documented sqlparse IDs); unit tests; end-to-end tests against a `postgres:16-alpine` service (Spark + GX + dbt); `dbt parse` |
+| `airflow-dag` | 31s (00:51:41 → 00:52:12 UTC) | Airflow 3.3.2 install with official constraints; DAG integrity tests |
+
+**Scope of this evidence:** the step results above come from the GitHub Actions API. Downloading job logs through the API requires repository admin rights, so the **exact test counts printed by CI were not retrieved** and are not claimed here; they are visible in the run's logs on GitHub. All exact counts in sections 1–4 come from local runs. The CI end-to-end step runs complete batches through `run_batch`, which includes `dbt seed/snapshot/run/test` and the 14 reconciliation checks; whether those passed in CI is implied by the step's success, not read from logs. `airflow dags test` (actual DAG execution) is **not** part of CI and was verified locally only (sections 1b and 2).
+
 ## Not verified
 
-- **Docker:** `docker build` / `docker compose up` were never run (Docker unavailable). The Airflow scheduler/API server (`airflow standalone`) was never run either; only `airflow dags test`.
-- **GitHub Actions:** the workflow has not run (the repository is not pushed); its commands were run locally.
+- **Docker / Docker Compose:** `docker build` / `docker compose up` were never run (Docker unavailable).
+- **Full Airflow scheduler:** the scheduler/API server (`airflow standalone`) was never run; the DAG was executed with `airflow dags test` (in-process, all 7 tasks).

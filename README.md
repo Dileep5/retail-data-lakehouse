@@ -1,5 +1,7 @@
 # Retail Data Lakehouse & Analytics Platform
 
+[![CI](https://github.com/Dileep5/retail-data-lakehouse/actions/workflows/ci.yml/badge.svg)](https://github.com/Dileep5/retail-data-lakehouse/actions/workflows/ci.yml)
+
 A batch data platform for a fictional retailer. Daily CSV exports and an operational PostgreSQL database feed a **Bronze → Silver** Parquet lake built with **PySpark**. A **Great Expectations** quality gate checks each batch before an idempotent load into a PostgreSQL warehouse. **dbt** then builds an SCD Type 2 customer dimension, incremental facts that handle late-arriving data, and reporting views. **Airflow** orchestrates the pipeline, and 14 reconciliation checks run per batch.
 
 ```mermaid
@@ -130,6 +132,13 @@ TEST_PG_ADMIN_URL=postgresql://postgres:pw@localhost:5432/postgres make test-int
 make test-dag                                                # 3 DAG tests (needs make install-airflow)
 ```
 
+**Where the results come from:**
+- **Local runs** (macOS, PostgreSQL 16, Java 17) produced the exact counts quoted in this README: 59 pytest tests, 40 dbt tests, 14 reconciliation checks per batch, and the `airflow dags test` execution.
+- **GitHub Actions** runs two jobs on every push:
+  - `pipeline`: lint, dependency checks, unit tests, end-to-end tests against a PostgreSQL service, and `dbt parse`;
+  - `airflow-dag`: the DAG integrity tests on Airflow 3.3.2.
+- **First CI run:** [41555834547](https://github.com/Dileep5/retail-data-lakehouse/actions/runs/41555834547) on commit `8abca04` passed both jobs. CI test counts are in the run logs and are not restated here.
+
 The end-to-end suite creates throwaway databases and runs 3 batches through Spark, GX, PostgreSQL and dbt. It asserts:
 - incremental extraction and late status changes;
 - late line items and late-customer re-attribution;
@@ -156,7 +165,7 @@ tests/       unit/  integration/  airflow/
 - **Plain Parquet, not Delta/Iceberg.** Merges swap directories and assume a single writer.
 - **Backfills need a rebuild.** Re-running older batches is refused.
 - **Small and local.** Spark runs locally; the reconciliation and GX checks use pandas.
-- **Not executed:** Docker, the Airflow scheduler/UI (`airflow standalone`) and GitHub Actions.
+- **Not executed:** Docker / Docker Compose (the images were never built) and the full Airflow scheduler/UI (`airflow standalone`). The DAG was executed with `airflow dags test`, and the test suite runs in GitHub Actions.
 - **Unfixed advisory:** `sqlparse` advisories can't be fixed until dbt-core relaxes its pin; see TROUBLESHOOTING.md.
 
 ## License

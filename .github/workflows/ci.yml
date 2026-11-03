@@ -33,6 +33,15 @@ jobs:
       - run: pip install -r requirements-dev.txt
       - name: Lint
         run: ruff check lakehouse analytics airflow tests
+      - name: Dependency checks
+        # sqlparse < 0.5.5 is pinned by every dbt-core 1.10.x release; it only parses
+        # this project's own dbt SQL. Documented in TROUBLESHOOTING.md.
+        run: |
+          pip check
+          pip install pip-audit
+          pip-audit -r requirements.txt --progress-spinner off \
+            --ignore-vuln PYSEC-2026-3696 --ignore-vuln PYSEC-2026-3697 --ignore-vuln PYSEC-2026-3698 \
+            --ignore-vuln PYSEC-2026-3699 --ignore-vuln PYSEC-2026-3923
       - name: Unit tests (PySpark, Great Expectations, generator)
         run: pytest tests/unit -q
       - name: End-to-end tests (PostgreSQL + Spark + GX + dbt)

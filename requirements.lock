@@ -48,7 +48,7 @@ psycopg==3.3.6
 psycopg-binary==3.3.6
 psycopg2-binary==2.9.13
 py4j==0.10.9.9
-pyarrow==21.0.0
+pyarrow==23.0.1
 pycparser==3.12
 pydantic==2.14.2
 pydantic-core==2.50.2
@@ -56,7 +56,7 @@ pydantic-settings==2.16.2
 pygments==2.21.0
 pyparsing==3.3.3
 pyspark==4.0.5
-pytest==8.4.2
+pytest==9.2.0
 python-dateutil==2.9.0.post0
 python-dotenv==1.2.4
 python-slugify==9.1.3
